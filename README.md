@@ -75,13 +75,13 @@ Readme.md для role ansible-clickhouse  уже присутствует в с�
 
 #
 <img src = "img/2-7.png" width = 60%>
-На основе tasks из старого playbook заполним новую role, затем подготовим Readme.md для role vector-role.  
+На основе tasks из старого playbook заполним новую role, затем подготовим Readme.md для role Lighthouse.  
 
 8.  Выложите все roles в репозитории. Проставьте теги, используя семантическую нумерацию. Добавьте roles в `requirements.yml` в playbook.
 
 #
 Выложим playbook в репозитории.
-[репозиторий lighthouse-role](https://github.com/YuryShelukhin/lighthouse-role/blob/master/README.md)
+[репозиторий lighthouse](https://github.com/YuryShelukhin/lighthouse-role/blob/master/README.md)
 [репозиторий vector-role](https://github.com/YuryShelukhin/vector-role/blob/master/README.md)
 
 9.  Переработайте playbook на использование roles. Не забудьте про зависимости LightHouse и возможности совмещения `roles` с `tasks`.
@@ -92,6 +92,10 @@ Readme.md для role ansible-clickhouse  уже присутствует в с�
 `ansible-galaxy install -r requirements.yml -p roles --force`
 
 Переработаем плейбук для использования трех ролей, для удобства сохранием его под названием `site2.yml`
+Запустим playbook на инфрастуктуре, созданной в terraform.
+
+<img src = "img/2-9.png" width = 60%>
+
 10.  Выложите playbook в репозиторий.
 11.  В ответе дайте ссылки на оба репозитория с roles и одну ссылку на репозиторий с playbook.
 
