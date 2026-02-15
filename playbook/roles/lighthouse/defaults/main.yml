@@ -1,0 +1,12 @@
+---
+
+lighthouse_root: /var/www/lighthouse
+
+lighthouse_version: master
+
+
+lighthouse_clickhouse_ip: ""           
+lighthouse_clickhouse_port: 8123
+
+lighthouse_nginx_site_name: lighthouse
+lighthouse_nginx_port: 80 

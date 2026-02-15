@@ -1,0 +1,83 @@
+---
+- name: Install Nginx
+  become: true
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+    lock_timeout: 300
+  register: nginx_install
+  retries: 6
+  delay: 30
+  until: nginx_install is not failed
+
+- name: Create Lighthouse root directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ lighthouse_root }}"
+    state: directory
+    mode: '0755'
+
+- name: Create subdirectories (css, js, img)
+  become: true
+  ansible.builtin.file:
+    path: "{{ lighthouse_root }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - css
+    - js
+    - img
+
+- name: Download Lighthouse files from GitHub
+  become: true
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/VKCOM/lighthouse/{{ lighthouse_version }}/{{ item }}"
+    dest: "{{ lighthouse_root }}/{{ item }}"
+    mode: '0644'
+  loop: "{{ lighthouse_files }}"
+
+- name: Update index.html to use remote ClickHouse host
+  become: true
+  ansible.builtin.replace:
+    path: "{{ lighthouse_root }}/index.html"
+    regexp: 'http://127\.0\.0\.1:8123'
+    replace: "http://{{ lighthouse_clickhouse_ip }}:{{ lighthouse_clickhouse_port }}"
+  when: lighthouse_clickhouse_ip | default('') | length > 0
+
+- name: Deploy Nginx site configuration
+  become: true
+  ansible.builtin.template:
+    src: lighthouse.conf.j2
+    dest: "/etc/nginx/sites-available/{{ lighthouse_nginx_site_name }}"
+    mode: '0644'
+  notify: Restart nginx
+
+- name: Enable Lighthouse site
+  become: true
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ lighthouse_nginx_site_name }}"
+    dest: "/etc/nginx/sites-enabled/{{ lighthouse_nginx_site_name }}"
+    state: link
+  notify: Restart nginx
+
+- name: Remove default Nginx site
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Restart nginx
+
+- name: Create Nginx log directory for Lighthouse
+  become: true
+  ansible.builtin.file:
+    path: "/var/log/nginx/{{ lighthouse_nginx_site_name }}"
+    state: directory
+    mode: '0755'
+
+- name: Start and enable Nginx
+  become: true
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true

@@ -1,0 +1,130 @@
+---
+- name: Prepare all hosts
+  hosts: all
+  become: true
+  tags: ["prepare"]
+  vars:
+    lighthouse_clickhouse_host: "{{ groups['clickhouse_servers'][0] if groups['clickhouse_servers'] is defined else 'clickhouse' }}"
+  tasks:
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - curl
+          - wget
+          - unzip
+        state: present
+
+    - name: Wait for cloud-init SSH keys
+      ansible.builtin.wait_for:
+        path: /home/ubuntu/.ssh/authorized_keys
+        timeout: 60
+        delay: 5
+
+    - name: Create ansible user
+      ansible.builtin.user:
+        name: ansible
+        shell: /bin/bash
+        createhome: true
+        groups: sudo
+
+    - name: Configure sudo for ansible user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/ansible
+        line: 'ansible ALL=(ALL) NOPASSWD:ALL'
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Create ansible SSH directory
+      ansible.builtin.file:
+        path: /home/ansible/.ssh
+        state: directory
+        owner: ansible
+        group: ansible
+        mode: '0700'
+
+    - name: Copy SSH keys to ansible user
+      ansible.builtin.copy:
+        src: /home/ubuntu/.ssh/authorized_keys
+        dest: /home/ansible/.ssh/authorized_keys
+        owner: ansible
+        group: ansible
+        mode: '0600'
+        remote_src: true
+
+- name: Install ClickHouse
+  hosts: clickhouse_servers
+  become: true
+  tags: ["clickhouse"]
+  vars:
+    clickhouse_version: 22.3.3.44
+    # Увеличиваем таймаут блокировки (если роль поддерживает)
+    clickhouse_apt_lock_timeout: 300
+
+  tasks:
+    - name: Stop unattended-upgrades service
+      ansible.builtin.systemd:
+        name: unattended-upgrades
+        state: stopped
+      ignore_errors: true
+      when: ansible_os_family == "Debian"
+
+    - name: Kill any remaining apt/dpkg processes
+      ansible.builtin.shell: |
+        pkill -f "apt|dpkg" || true
+      changed_when: false
+      ignore_errors: true
+      when: ansible_os_family == "Debian"
+
+    - name: Wait for apt locks to be released
+      ansible.builtin.shell: |
+        while lsof /var/lib/dpkg/lock-frontend 2>/dev/null; do
+          sleep 2
+        done
+      changed_when: false
+      when: ansible_os_family == "Debian"
+
+  roles:
+    - role: clickhouse
+      # clickhouse_version: "{{ clickhouse_version }}"  # если нужно явно передать
+
+  post_tasks:
+    - name: Restart unattended-upgrades (optional)
+      ansible.builtin.systemd:
+        name: unattended-upgrades
+        state: started
+      ignore_errors: true
+      when: ansible_os_family == "Debian"
+ 
+- name: Install and configure Vector
+  hosts: vector_servers
+  become: true
+  tags: ["vector"]
+  vars:
+    clickhouse_host: "{{ groups['clickhouse_servers'][0] }}"
+    clickhouse_port: 8123
+    vector_version: "0.31.0"
+  roles:
+    - role: vector-role
+
+- name: Install and configure LightHouse
+  hosts: lighthouse_servers
+  become: true
+  tags: ["lighthouse"]
+  vars:
+    clickhouse_host: "{{ groups['clickhouse_servers'][0] }}"
+    clickhouse_ip: >-
+      {{ hostvars[clickhouse_host]['ansible_host'] |
+         default(hostvars[clickhouse_host]['ansible_default_ipv4']['address']) }}
+    clickhouse_port: 8123
+  roles:
+    - role: lighthouse
+      lighthouse_clickhouse_ip: "{{ clickhouse_ip }}"
+      lighthouse_clickhouse_port: "{{ clickhouse_port }}"

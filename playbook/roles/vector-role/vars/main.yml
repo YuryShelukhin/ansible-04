@@ -1,0 +1,5 @@
+---
+vector_repo_script_url: "https://setup.vector.dev"
+vector_repo_script_dest: /tmp/setup-vector.sh
+vector_log_file: /var/log/vector.log
+vector_pid_file: /var/run/vector.pid

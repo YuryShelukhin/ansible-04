@@ -1,0 +1,8 @@
+---
+
+vector_version: "0.31.0"
+
+clickhouse_host: "{{ groups['clickhouse_servers'][0] | default('clickhouse-01') }}"
+clickhouse_port: 8123
+
+vector_config_path: /etc/vector/vector.yml

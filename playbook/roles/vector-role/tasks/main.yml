@@ -1,0 +1,73 @@
+---
+- name: Download Vector repository setup script
+  become: true
+  ansible.builtin.get_url:
+    url: "{{ vector_repo_script_url }}"
+    dest: "{{ vector_repo_script_dest }}"
+    mode: '0755'
+
+- name: Run Vector repository setup script
+  become: true
+  ansible.builtin.command: bash {{ vector_repo_script_dest }}
+  args:
+    creates: /etc/apt/sources.list.d/vector.list
+  changed_when: false
+
+- name: Install Vector package
+  become: true
+  ansible.builtin.apt:
+    name: vector
+    state: present
+    update_cache: true
+    lock_timeout: 300
+  register: vector_install
+  retries: 6
+  delay: 20
+  until: vector_install is not failed
+
+- name: Create Vector config directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ vector_config_path | dirname }}"
+    state: directory
+    mode: '0755'
+
+- name: Check if systemd is running
+  ansible.builtin.set_fact:
+    has_systemd: "{{ (ansible_facts.service_mgr == 'systemd') | bool }}"
+  changed_when: false
+
+- name: Deploy Vector configuration template
+  become: true
+  ansible.builtin.template:
+    src: vector.yml.j2
+    dest: "{{ vector_config_path }}"
+    mode: '0644'
+  notify: Restart vector service
+
+- name: Reload systemd to detect new service (systemd)
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: has_systemd | bool
+  changed_when: false
+
+- name: Enable and start Vector service (systemd)
+  become: true
+  ansible.builtin.service:
+    name: vector
+    state: started
+    enabled: true
+  when: has_systemd | bool
+
+- name: Start Vector directly (non‑systemd)
+  become: true
+  ansible.builtin.shell: |
+    nohup vector --config {{ vector_config_path }} > {{ vector_log_file }} 2>&1 &
+    echo $!
+  args:
+    creates: "{{ vector_pid_file }}"
+  when: not (has_systemd | bool)
+  changed_when: false  
+  
+  

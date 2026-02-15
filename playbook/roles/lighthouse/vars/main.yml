@@ -1,0 +1,7 @@
+---
+lighthouse_files:
+  - index.html
+  - app.js
+  - jquery.js
+  - LICENSE
+  - README.md

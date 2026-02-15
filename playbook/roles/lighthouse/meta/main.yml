@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: Yury Shelukhin
+  description: Install and configure Lighthouse (web UI for ClickHouse)
+  company: your_company
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+  galaxy_tags:
+    - lighthouse
+    - clickhouse
+    - nginx
+    - web
+dependencies: []

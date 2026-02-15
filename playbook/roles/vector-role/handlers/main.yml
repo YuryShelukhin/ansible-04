@@ -1,0 +1,19 @@
+---
+- name: Restart vector service
+  become: true
+  when: has_systemd is defined
+  block:
+    - name: Restart via systemd
+      ansible.builtin.systemd:
+        name: vector
+        state: restarted
+      when: has_systemd | bool
+
+    - name: Restart via pkill
+      ansible.builtin.shell: |
+        if pgrep -x vector > /dev/null; then
+          pkill vector
+        fi
+        nohup vector --config {{ vector_config_path }} > {{ vector_log_file }} 2>&1 &
+      when: not (has_systemd | bool)
+      changed_when: false
